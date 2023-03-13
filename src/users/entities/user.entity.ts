@@ -1,9 +1,9 @@
-import { Field, InputType, ObjectType, registerEnumType } from '@nestjs/graphql';
-import { BeforeInsert, Column, Entity } from 'typeorm';
-import * as bcrypt from 'bcrypt';
-import { CoreEntity } from 'src/common/entities/core.entity';
 import { InternalServerErrorException } from '@nestjs/common';
+import { Field, InputType, ObjectType, registerEnumType } from '@nestjs/graphql';
+import * as bcrypt from 'bcrypt';
 import { IsEmail, IsEnum } from 'class-validator';
+import { CoreEntity } from 'src/common/entities/core.entity';
+import { BeforeInsert, BeforeUpdate, Column, Entity } from 'typeorm';
 
 enum UserRole {
   Client,
@@ -22,7 +22,8 @@ export class User extends CoreEntity {
   @IsEmail()
   public email: string;
 
-  @Column()
+  // don't select password on queries
+  @Column({ select: false })
   @Field(type => String)
   public password: string;
 
@@ -31,13 +32,20 @@ export class User extends CoreEntity {
   @IsEnum(UserRole)
   public role: UserRole;
 
+  @Column({ default: false })
+  @Field(type => Boolean)
+  public verified: boolean;
+
   @BeforeInsert()
+  @BeforeUpdate()
   public async hashPassword(): Promise<void> {
-    try {
-      this.password = await bcrypt.hash(this.password, 10);
-    } catch (error) {
-      console.log(error);
-      throw new InternalServerErrorException();
+    // if this db command has a password on it, then hash the password
+    if (this.password) {
+      try {
+        this.password = await bcrypt.hash(this.password, 10);
+      } catch (error) {
+        throw new InternalServerErrorException();
+      }
     }
   }
 
